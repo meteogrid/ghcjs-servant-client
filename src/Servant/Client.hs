@@ -43,6 +43,7 @@ import           Servant.Common.Req
 import           Data.JSString              (JSString(..))
 import           GHCJS.Marshal
 import           GHCJS.Types
+import           Web.HttpApiData (ToHttpApiData(..))
 
 -- * Accessing APIs as a Client
 
@@ -97,7 +98,7 @@ instance (HasClient a, HasClient b) => HasClient (a :<|> b) where
 -- of this value at the right place in the request path.
 --
 -- You can control how values for this type are turned into
--- text by specifying a 'ToText' instance for your type.
+-- text by specifying a 'ToHttpApiData instance for your type.
 --
 -- Example:
 --
@@ -110,7 +111,7 @@ instance (HasClient a, HasClient b) => HasClient (a :<|> b) where
 -- > getBook = client myApi host
 -- >   where host = BaseUrl Http "localhost" 8080
 -- > -- then you can just use "getBook" to query that endpoint
-instance (KnownSymbol capture, ToText a, HasClient sublayout)
+instance (KnownSymbol capture, ToHttpApiData a, HasClient sublayout)
       => HasClient (Capture capture a :> sublayout) where
 
   type Client (Capture capture a :> sublayout) =
@@ -121,7 +122,7 @@ instance (KnownSymbol capture, ToText a, HasClient sublayout)
                     (appendToPath p req)
                     baseurl
 
-    where p = unpack (toText val)
+    where p = unpack (toUrlPiece val)
 
 -- | If you have a 'Delete' endpoint in your API, the client
 -- side querying function that is created when calling 'client'
@@ -211,12 +212,12 @@ instance
 -- That function will take care of encoding this argument as Text
 -- in the request headers.
 --
--- All you need is for your type to have a 'ToText' instance.
+-- All you need is for your type to have a 'ToHttpApiData' instance.
 --
 -- Example:
 --
 -- > newtype Referer = Referer { referrer :: Text }
--- >   deriving (Eq, Show, Generic, FromText, ToText)
+-- >   deriving (Eq, Show, Generic, FromText, ToHttpApiData)
 -- >
 -- >            -- GET /view-my-referer
 -- > type MyApi = "view-my-referer" :> Header "Referer" Referer :> Get '[JSON] Referer
@@ -229,7 +230,7 @@ instance
 -- >   where host = BaseUrl Http "localhost" 8080
 -- > -- then you can just use "viewRefer" to query that endpoint
 -- > -- specifying Nothing or e.g Just "http://haskell.org/" as arguments
-instance (KnownSymbol sym, ToText a, HasClient sublayout)
+instance (KnownSymbol sym, ToHttpApiData a, HasClient sublayout)
       => HasClient (Header sym a :> sublayout) where
 
   type Client (Header sym a :> sublayout) =
@@ -373,7 +374,7 @@ instance
 -- of inserting a textual representation of this value in the query string.
 --
 -- You can control how values for your type are turned into
--- text by specifying a 'ToText' instance for your type.
+-- text by specifying a 'ToHttpApiData' instance for your type.
 --
 -- Example:
 --
@@ -388,7 +389,7 @@ instance
 -- > -- then you can just use "getBooksBy" to query that endpoint.
 -- > -- 'getBooksBy Nothing' for all books
 -- > -- 'getBooksBy (Just "Isaac Asimov")' to get all books by Isaac Asimov
-instance (KnownSymbol sym, ToText a, HasClient sublayout)
+instance (KnownSymbol sym, ToHttpApiData a, HasClient sublayout)
       => HasClient (QueryParam sym a :> sublayout) where
 
   type Client (QueryParam sym a :> sublayout) =
@@ -405,7 +406,7 @@ instance (KnownSymbol sym, ToText a, HasClient sublayout)
 
     where pname  = cs pname'
           pname' = symbolVal (Proxy :: Proxy sym)
-          mparamText = fmap toText mparam
+          mparamText = fmap toQueryParam mparam
 
 -- | If you use a 'QueryParams' in one of your endpoints in your API,
 -- the corresponding querying function will automatically take
@@ -419,7 +420,7 @@ instance (KnownSymbol sym, ToText a, HasClient sublayout)
 -- under the same query string parameter name.
 --
 -- You can control how values for your type are turned into
--- text by specifying a 'ToText' instance for your type.
+-- text by specifying a 'ToHttpApiData' instance for your type.
 --
 -- Example:
 --
@@ -435,7 +436,7 @@ instance (KnownSymbol sym, ToText a, HasClient sublayout)
 -- > -- 'getBooksBy []' for all books
 -- > -- 'getBooksBy ["Isaac Asimov", "Robert A. Heinlein"]'
 -- > --   to get all books by Asimov and Heinlein
-instance (KnownSymbol sym, ToText a, HasClient sublayout)
+instance (KnownSymbol sym, ToHttpApiData a, HasClient sublayout)
       => HasClient (QueryParams sym a :> sublayout) where
 
   type Client (QueryParams sym a :> sublayout) =
@@ -451,7 +452,7 @@ instance (KnownSymbol sym, ToText a, HasClient sublayout)
 
     where pname  = cs pname'
           pname' = symbolVal (Proxy :: Proxy sym)
-          paramlist' = map (Just . toText) paramlist
+          paramlist' = map (Just . toQueryParam) paramlist
 
 -- | If you use a 'QueryFlag' in one of your endpoints in your API,
 -- the corresponding querying function will automatically take
@@ -491,133 +492,6 @@ instance (KnownSymbol sym, HasClient sublayout)
 
     where paramname = cs $ symbolVal (Proxy :: Proxy sym)
 
--- | If you use a 'MatrixParam' in one of your endpoints in your API,
--- the corresponding querying function will automatically take
--- an additional argument of the type specified by your 'MatrixParam',
--- enclosed in Maybe.
---
--- If you give Nothing, nothing will be added to the query string.
---
--- If you give a non-'Nothing' value, this function will take care
--- of inserting a textual representation of this value in the query string.
---
--- You can control how values for your type are turned into
--- text by specifying a 'ToText' instance for your type.
---
--- Example:
---
--- > type MyApi = "books" :> MatrixParam "author" Text :> Get '[JSON] [Book]
--- >
--- > myApi :: Proxy MyApi
--- > myApi = Proxy
--- >
--- > getBooksBy :: Maybe Text -> EitherT String IO [Book]
--- > getBooksBy = client myApi host
--- >   where host = BaseUrl Http "localhost" 8080
--- > -- then you can just use "getBooksBy" to query that endpoint.
--- > -- 'getBooksBy Nothing' for all books
--- > -- 'getBooksBy (Just "Isaac Asimov")' to get all books by Isaac Asimov
-instance (KnownSymbol sym, ToText a, HasClient sublayout)
-      => HasClient (MatrixParam sym a :> sublayout) where
-
-  type Client (MatrixParam sym a :> sublayout) =
-    Maybe a -> Client sublayout
-
-  -- if mparam = Nothing, we don't add it to the query string
-  clientWithRoute Proxy req baseurl mparam =
-    clientWithRoute (Proxy :: Proxy sublayout)
-                    (maybe req
-                           (flip (appendToMatrixParams pname . Just) req)
-                           mparamText
-                    )
-                    baseurl
-
-    where pname = symbolVal (Proxy :: Proxy sym)
-          mparamText = fmap (cs . toText) mparam
-
--- | If you use a 'MatrixParams' in one of your endpoints in your API,
--- the corresponding querying function will automatically take an
--- additional argument, a list of values of the type specified by your
--- 'MatrixParams'.
---
--- If you give an empty list, nothing will be added to the query string.
---
--- Otherwise, this function will take care of inserting a textual
--- representation of your values in the path segment string, under the
--- same matrix string parameter name.
---
--- You can control how values for your type are turned into text by
--- specifying a 'ToText' instance for your type.
---
--- Example:
---
--- > type MyApi = "books" :> MatrixParams "authors" Text :> Get '[JSON] [Book]
--- >
--- > myApi :: Proxy MyApi
--- > myApi = Proxy
--- >
--- > getBooksBy :: [Text] -> EitherT String IO [Book]
--- > getBooksBy = client myApi host
--- >   where host = BaseUrl Http "localhost" 8080
--- > -- then you can just use "getBooksBy" to query that endpoint.
--- > -- 'getBooksBy []' for all books
--- > -- 'getBooksBy ["Isaac Asimov", "Robert A. Heinlein"]'
--- > --   to get all books by Asimov and Heinlein
-instance (KnownSymbol sym, ToText a, HasClient sublayout)
-      => HasClient (MatrixParams sym a :> sublayout) where
-
-  type Client (MatrixParams sym a :> sublayout) =
-    [a] -> Client sublayout
-
-  clientWithRoute Proxy req baseurl paramlist =
-    clientWithRoute (Proxy :: Proxy sublayout)
-                    (foldl' (\ req' value -> maybe req' (flip (appendToMatrixParams pname) req' . Just . cs) value)
-                            req
-                            paramlist'
-                    )
-                    baseurl
-
-    where pname  = cs pname'
-          pname' = symbolVal (Proxy :: Proxy sym)
-          paramlist' = map (Just . toText) paramlist
-
--- | If you use a 'MatrixFlag' in one of your endpoints in your API,
--- the corresponding querying function will automatically take an
--- additional 'Bool' argument.
---
--- If you give 'False', nothing will be added to the path segment.
---
--- Otherwise, this function will insert a value-less matrix parameter
--- under the name associated to your 'MatrixFlag'.
---
--- Example:
---
--- > type MyApi = "books" :> MatrixFlag "published" :> Get '[JSON] [Book]
--- >
--- > myApi :: Proxy MyApi
--- > myApi = Proxy
--- >
--- > getBooks :: Bool -> EitherT String IO [Book]
--- > getBooks = client myApi host
--- >   where host = BaseUrl Http "localhost" 8080
--- > -- then you can just use "getBooks" to query that endpoint.
--- > -- 'getBooksBy False' for all books
--- > -- 'getBooksBy True' to only get _already published_ books
-instance (KnownSymbol sym, HasClient sublayout)
-      => HasClient (MatrixFlag sym :> sublayout) where
-
-  type Client (MatrixFlag sym :> sublayout) =
-    Bool -> Client sublayout
-
-  clientWithRoute Proxy req baseurl flag =
-    clientWithRoute (Proxy :: Proxy sublayout)
-                    (if flag
-                       then appendToMatrixParams paramname Nothing req
-                       else req
-                    )
-                    baseurl
-
-    where paramname = cs $ symbolVal (Proxy :: Proxy sym)
 
 -- | Pick a 'Method' and specify where the server you want to query is. You get
 -- back the full `Response`.

@@ -39,7 +39,7 @@ import qualified Network.HTTP.Types.Header   as HTTP
 import Network.URI
 import Servant.API.ContentTypes
 import Servant.Common.BaseUrl
-import Servant.Common.Text
+--import Servant.Common.Text
 import System.IO.Unsafe
 import GHCJS.Foreign (jsTrue, jsFalse)
 import GHCJS.Foreign.Callback (Callback (..)
@@ -58,6 +58,7 @@ import Data.CaseInsensitive
 import Data.Char
 import Unsafe.Coerce
 import GHCJS.Foreign.QQ
+import Web.HttpApiData (ToHttpApiData(..))
 
 data ServantError
   = FailureResponse
@@ -96,7 +97,7 @@ data Req = Req
   , qs        :: QueryText
   , reqBody   :: Maybe (IO JSVal, MediaType)
   , reqAccept :: [MediaType]
-  , headers   :: [(String, Text)]
+  , headers   :: [(String, BS.ByteString)]
   }
 
 defReq :: Req
@@ -121,9 +122,9 @@ appendToQueryString pname pvalue req =
   req { qs = qs req ++ [(pname, pvalue)]
       }
 
-addHeader :: ToText a => String -> a -> Req -> Req
+addHeader :: ToHttpApiData a => String -> a -> Req -> Req
 addHeader name val req = req { headers = headers req
-                                      ++ [(name, toText val)]
+                                      ++ [(name, toHeader val)]
                              }
 
 setRQBody :: IO JSVal -> MediaType -> Req -> Req
@@ -219,9 +220,9 @@ jsXhrResponse jsv = [jsu|
    var contentResponse = typeof `jsv.response;
    if( contentResponse == "undefined" ) { //This takes care of the lack of a 'response' field in ie9
     return JSON.parse(`jsv.responseText);
-   }   
+   }
    else if (contentResponse == "string" ) //IE11 bug
-   {   
+   {
     return JSON.parse(`jsv.response);
    }
    else {
@@ -229,7 +230,7 @@ jsXhrResponse jsv = [jsu|
    }
 }())
 |]
-                     
+
 foreign import javascript unsafe "$1.responseType = $2"
   jsXhrResponseType:: JSVal -> JSString -> IO ()
 foreign import javascript unsafe "$1.status"

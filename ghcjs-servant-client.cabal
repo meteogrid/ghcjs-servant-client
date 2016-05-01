@@ -36,10 +36,11 @@ library
     , either
     , exceptions
     , http-media
+    , http-api-data
     , http-types
     , network-uri >= 2.6
     , safe
-    , servant == 0.4.*
+    , servant >= 0.7
     , string-conversions
     , text
     , transformers
@@ -76,9 +77,9 @@ test-suite spec
     , HUnit
     , network >= 2.6
     , QuickCheck >= 2.7
-    , servant == 0.4.*
+    , servant
     , servant-client
-    , servant-server == 0.4.*
+    , servant-server
     , text
     , wai
     , warp
