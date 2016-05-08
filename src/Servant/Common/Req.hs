@@ -8,6 +8,8 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE MultiParamTypeClasses    #-}
 {-# LANGUAGE QuasiQuotes    #-}
+{-# LANGUAGE LambdaCase    #-}
+{-# LANGUAGE NamedFieldPuns    #-}
 
 module Servant.Common.Req where
 
@@ -80,6 +82,32 @@ data ServantError
     , responseBody              :: JSVal
     }
   deriving (Typeable)
+
+instance Show ServantError where
+  show = \case
+    FailureResponse{responseStatus, responseContentType} ->
+      Prelude.concat [ "FailureResponse"
+                     , " { responseStatus = ", show responseStatus
+                     , " , responseContentType = ", show responseContentType
+                     , " }"
+                     ]
+    DecodeFailure{decodeError, responseContentType} ->
+      Prelude.concat [ "DecodeFailure"
+                     , " { decodeError = ", show decodeError
+                     , " , responseContentType = ", show responseContentType
+                     , " }"
+                     ]
+    UnsupportedContentType{responseContentType} ->
+      Prelude.concat [ "UnsupportedContentType"
+                     , " { responseContentType = ", show responseContentType
+                     , " }"
+                     ]
+    InvalidContentTypeHeader{responseContentTypeHeader} ->
+      Prelude.concat [ "InvalidContentTypeHeader"
+                     , " { responseContentTypeHeader = "
+                         , show responseContentTypeHeader
+                     , " }"
+                     ]
 
 -- instance Exception ServantError
 
